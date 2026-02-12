@@ -56,19 +56,55 @@ def masked_llr_scores(model, alphabet, seq: str, device: str = "cpu") -> pd.Data
     return df
 
 def plot_heatmap(df: pd.DataFrame, out_png: Path):
+    L = df.shape[0]
+    wt = df["wt"].tolist()
     mat = df[AA20].to_numpy().T  # 20 x L
-    fig, ax = plt.subplots(figsize=(max(10, df.shape[0] / 8), 6))
-    im = ax.imshow(mat, aspect="auto")
-    ax.set_yticks(np.arange(len(AA20)))
-    ax.set_yticklabels(AA20)
-    ax.set_xlabel("Position")
-    ax.set_ylabel("Mutant AA")
-    ax.set_title("ESM-2 masked LLR mutation scan (higher = more plausible)")
-    fig.colorbar(im, ax=ax, shrink=0.9, label="log p(mut) - log p(wt)")
-    fig.tight_layout()
-    fig.savefig(out_png, dpi=200)
-    plt.close(fig)
 
+    # 21 x L: 第0行留给 WT 字母，用 NaN 占位（显示为白色）
+    full = np.vstack([np.full((1, L), np.nan, dtype=np.float32), mat])
+
+    # 让 NaN 显示为白色
+    cmap = plt.cm.viridis.copy()
+    cmap.set_bad(color="white")
+
+    # “拉宽每个格子”：每列对应多少英寸（越大越宽）
+    col_in = 0.22
+    row_in = 0.28
+    fig_w = max(12, L * col_in)
+    fig_h = (21 * row_in) + 1.5
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+
+    im = ax.imshow(np.ma.masked_invalid(full), aspect="auto", cmap=cmap)
+
+    # y 轴：第0行是 WT，其余 20 行是突变氨基酸
+    ylabels = ["WT"] + AA20
+    ax.set_yticks(np.arange(21))
+    ax.set_yticklabels(ylabels)
+
+    # x 轴：每列就是一个位置（严格 1:1）
+    ax.set_xticks(np.arange(L))
+    ax.set_xticklabels(np.arange(1, L + 1), fontsize=6, rotation=90)
+    ax.set_xlabel("Position (1..L)")
+    ax.set_ylabel("")
+
+    # 在 WT 行每个格子写一个字母（黑字，保证可读）
+    for x, aa in enumerate(wt):
+        ax.text(x, 0, aa, ha="center", va="center",
+                fontsize=8, color="black", family="monospace")
+
+    # 网格线，确保视觉上格子对齐
+    ax.set_xticks(np.arange(-0.5, L, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, 21, 1), minor=True)
+    ax.grid(which="minor", linestyle="-", linewidth=0.3)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    ax.set_title("DHFR mutation scan (ESM-2 masked LLR)")
+    fig.colorbar(im, ax=ax, shrink=0.9, label="log p(mut) - log p(wt)")
+
+    fig.tight_layout()
+    fig.savefig(out_png, dpi=250)
+    plt.close(fig)
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--fasta", default="data/dhfr.fasta")
