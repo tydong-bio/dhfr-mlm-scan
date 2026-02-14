@@ -76,6 +76,13 @@ def plot_heatmap(df: pd.DataFrame, out_png: Path):
     fig, ax = plt.subplots(figsize=(fig_w, fig_h))
 
     im = ax.imshow(np.ma.masked_invalid(full), aspect="auto", cmap=cmap)
+        # highlight constrained/conserved sites (1-based positions)
+    highlight = [43,27,31,1,48,46,81,40,47,50,80,41,60,83,42]
+    for p in highlight:
+        x = p - 1  # imshow uses 0-based column index
+        ax.axvline(x=x, linewidth=0.8)
+    # label the most conserved one
+    ax.text(43-1, -0.8, "G43", ha="center", va="bottom", fontsize=10, color="black")
 
     # y 轴：第0行是 WT，其余 20 行是突变氨基酸
     ylabels = ["WT"] + AA20
